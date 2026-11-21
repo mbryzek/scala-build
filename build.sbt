@@ -34,7 +34,7 @@ ThisBuild / version := "0.0.17"
 // repository as GitHub holds it.
 BryzekLibSettings.buildSettings("scala-build")
 
-ThisBuild / scalaVersion := "3.8.4"
+ThisBuild / scalaVersion := "3.10.1"
 
 ThisBuild / resolvers += "Bryzek Maven repository" at "https://maven.bryzek.com"
 
@@ -69,7 +69,7 @@ lazy val sbtModule = project
       // The oldest sbt a consumer runs (play-core). Provided: the consumer's own sbt is what loads it.
       "org.scala-sbt" % "sbt" % "1.12.11" % Provided,
       // `BryzekLibSettings.rootSettings` sets `scalafmtOnCompile`; every consumer adds sbt-scalafmt.
-      Defaults.sbtPluginExtra("org.scalameta" % "sbt-scalafmt" % "2.6.1", "1.0", "2.12") % Provided,
+      Defaults.sbtPluginExtra("org.scalameta" % "sbt-scalafmt" % "2.6.2", "1.0", "2.12") % Provided,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test
     )
   )

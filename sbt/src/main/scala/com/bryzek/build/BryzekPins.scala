@@ -119,7 +119,7 @@ object BryzekPins {
   // reaches Jackson only through internal SPI that a minor line is free to move. `Jackson3PinSpec`
   // asserts two of those limits behaviourally, so a pin that slips below the floor fails there by
   // name.
-  val jackson3Version = "3.1.7"
+  val jackson3Version = "3.3.0"
 
   val jackson3: Seq[ModuleID] = Seq(
     "tools.jackson.core" % "jackson-databind" % jackson3Version,
@@ -155,7 +155,7 @@ object BryzekPins {
   // interfaces AND the `InvocationHandler` behind them. 1.5.34 refuses proxies unconditionally, so
   // 1.5.34 is the lowest this pin may state.
   //
-  // 1.6.7 rather than that floor: it clears all four, carries no open advisory of its own, and is
+  // 1.6.8 rather than that floor: it clears all four, carries no open advisory of its own, and is
   // the line Play 3.0.12's play-logback resolves (1.6.4), so a lib that puts Play on its classpath
   // and one that only tests against play-test resolve the same logback, and one floor holds across
   // every lib-* build rather than one per repo.
@@ -175,7 +175,7 @@ object BryzekPins {
   // How a build applies it is its own decision, stated in its build.sbt: a lib that never loads
   // logback outside its suite overrides it, so no logback edge reaches its POM; a lib that puts
   // logback on its consumers' classpath (through Play) DECLARES it, so the floor reaches them.
-  val logbackVersion = "1.6.7"
+  val logbackVersion = "1.6.8"
 
   val logback: Seq[ModuleID] = Seq(
     "ch.qos.logback" % "logback-classic" % logbackVersion,

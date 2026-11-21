@@ -215,7 +215,7 @@ private[testkit] final class ForkSafeRunner(underlying: Runner, doneTimeoutMilli
     val worker = new Thread(
       () => {
         try outcome.set(Some(Right(underlying.done())))
-        catch { case t: Throwable => outcome.set(Some(Left(t))) }
+        catch { case t @ (_: Exception | _: Error) => outcome.set(Some(Left(t))) }
       },
       s"fork-safe-scalatest-done-$port"
     )
