@@ -138,12 +138,12 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>Nor does it make the failure SURVIVABLE. What sbt reports for exit 86 is
  * {@code sbt.TestsFailedException: Tests unsuccessful}, which the merge lane refuses like any
  * other red — so an occurrence parked every open pull request in the repo over a fork that ran
- * nothing. {@code ci/build.sh}'s {@code exit_if_fork_never_configured} is the other end of that:
- * it greps the build log for the sentence both diagnostics below carry, and when that is the only
- * failure in the run it exits 75 so the fleet records an infrastructure fault instead of a red on
- * the branch. The two are a contract across a Java file and a shell script, so
- * {@code scripts/test/ci_fork_fault_test.rb} asserts the sentence the script greps for is in both
- * of them (ISS-5584).
+ * nothing. {@code exit_if_fork_never_configured} in platform's {@code ci/build.slow.sh} is the
+ * other end of that: it greps the build log for the sentence both diagnostics below carry, and when
+ * that is the only failure in the run it exits 75 so the fleet records an infrastructure fault
+ * instead of a red on the branch. The two are a contract across a Java file and a shell script, so
+ * platform's {@code scripts/ocaml/ci_checks/test/ci_fork_fault_test.ml} asserts the sentence the
+ * script greps for is in both of them (ISS-5584).
  *
  * <p>Everything here is defensive to the point of rudeness. It runs in every forked test JVM in the
  * build, so an agent that threw, hung, or halted a healthy fork would be far worse than the bug it
