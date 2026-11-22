@@ -317,9 +317,9 @@ class ForkSafeExitAgentSpec extends AnyFunSpec with Matchers with BeforeAndAfter
     // runner carrying several sessions and a build it can outrun the bound the agent gives it, and
     // the fork then reports — correctly, and exactly as the two cases above require — that it could
     // not be asked. That is a statement about the runner rather than about this branch, and it is
-    // the shape `ci/build.sh` already declines to call a red: this CANCELS for the same reason that
-    // exits 75 there. Every other outcome still fails, including an accusation, a holder that is
-    // not the parent, and no verdict at all.
+    // the shape platform's `ci/build.slow.sh` already declines to call a red: this CANCELS for the
+    // same reason that its `exit_if_fork_never_configured` exits 75 there. Every other outcome
+    // still fails, including an accusation, a holder that is not the parent, and no verdict at all.
     it("reports who held the port, from inside a real fork") {
       assume(owned.isDefined, s"${ForkSafeExitAgent.LsofBinary} is not executable on this machine")
       val (port, run) = result(owned.get)
