@@ -2,8 +2,8 @@ package com.bryzek.build
 
 import sbt._
 
-/** The security pins every Scala build on this fleet resolves against: Jackson 2, Jackson 3 and
-  * logback.
+/** The security pins every Scala build on this fleet resolves against: Jackson 2, Jackson 3,
+  * logback, and the jline, log4j and rhino jars sbt and Play's sbt-plugin bring.
   *
   * Published in `scala-build-sbt` and reached from a build.sbt as `BryzekPins` through
   * [[BryzekBuildPlugin]]'s `autoImport`. A build pins a version of scala-build in its
@@ -197,5 +197,16 @@ object BryzekPins {
 
   val log4j: Seq[ModuleID] = Seq(
     "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
+  )
+
+  // Rhino reaches a build through Play's sbt-plugin (sbt-js-engine > trireme-core), which declares
+  // 1.7.10. Below 1.7.14.1 -- and on 1.7.15 and 1.8.0 -- `Number.prototype.toFixed()` spins for
+  // minutes on specific inputs (GHSA-3w8q-xq97-5j7x). 1.7.14.1 is the patch on the 1.7.14 line,
+  // the nearest above what trireme was built against; the 1.7.15 and 1.8 lines are a further
+  // minor that trireme was never compiled against.
+  val rhinoVersion = "1.7.14.1"
+
+  val rhino: Seq[ModuleID] = Seq(
+    "org.mozilla" % "rhino" % rhinoVersion,
   )
 }
