@@ -165,7 +165,23 @@ object LaneClone {
   def cloneLine(database: String, seconds: Double): String =
     "ci-db: clone " + database + " " + String.format(java.util.Locale.ROOT, "%.3f", Double.box(seconds))
 
-  /** `CREATE DATABASE ... TEMPLATE`, and the one way it fails that is worth naming: Postgres
+  /** The statements that make lane `to`: the clone, and `jit = off` on it, which every session opened in the lane
+    * starts with.
+    *
+    * A backend inside an LLVM compile does not act on the termination `DROP DATABASE ... WITH (FORCE)` sends it until
+    * the compile ends, and Postgres refuses the drop after five seconds. A lane's statistics can put a wide read past
+    * every JIT cost threshold (the claim's, thousands of functions, compiles for tens of seconds), so a fork that exits
+    * during one leaves a lane that neither its own drop, the last group's, nor the next run's clone can take
+    * (ISS-129746). Production runs with JIT off through a setting each application records on its login role at boot
+    * (play-core `core.db.RoleSettings`); the sessions a pool opens before that keep JIT, and `CREATE DATABASE ...
+    * TEMPLATE` copies no setting. Set on the lane, the first session has it.
+    */
+  def cloneSql(from: String, to: String, owner: String): Seq[String] = Seq(
+    s"""CREATE DATABASE "$to" TEMPLATE "$from" OWNER "$owner"""",
+    s"""ALTER DATABASE "$to" SET jit = off""",
+  )
+
+  /** [[cloneSql]], and the one way it fails that is worth naming: Postgres
     * refuses while ANY session is connected to the template.
     *
     * Nothing in the run holds the session database — every fork opens its own clone — so what this
@@ -178,7 +194,7 @@ object LaneClone {
     * costs one re-run and says exactly what to close.
     */
   private def clone(c: Connection, from: String, to: String, owner: String): Unit =
-    try exec(c, s"""CREATE DATABASE "$to" TEMPLATE "$from" OWNER "$owner"""")
+    try cloneSql(from, to, owner).foreach(exec(c, _))
     catch {
       case e: SQLException if Option(e.getMessage).exists(_.contains("being accessed by other users")) =>
         throw new RuntimeException(
