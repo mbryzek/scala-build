@@ -103,6 +103,15 @@ class ShardDatabaseSpec extends AnyFunSpec with Matchers {
     }
   }
 
+  describe("LaneClone.cloneSql") {
+    it("clones the lane and turns JIT off on it, since a backend compiling refuses the lane's drop (ISS-129746)") {
+      LaneClone.cloneSql(Session, Lane, "api") mustBe Seq(
+        s"""CREATE DATABASE "$Lane" TEMPLATE "$Session" OWNER "api"""",
+        s"""ALTER DATABASE "$Lane" SET jit = off""",
+      )
+    }
+  }
+
   describe("LaneClone.cloneLine") {
     it("puts the seconds last, to the millisecond, with a point") {
       LaneClone.cloneLine(Lane, 0.2345) mustBe s"ci-db: clone $Lane 0.235"
