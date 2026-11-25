@@ -176,6 +176,35 @@ class CiTestListsSpec extends AnyFunSpec with Matchers {
     }
   }
 
+  describe("proofVerdict") {
+
+    it("passes when every planned spec passed and every proof spec was found") {
+      CiTestLists.proofVerdict(1, Nil, Nil, "5 alone and 3 beside each") mustBe Right(
+        "ci-proof: passed 1 spec(s), 5 alone and 3 beside each"
+      )
+    }
+
+    it("fails naming each spec whose proof failed") {
+      CiTestLists.proofVerdict(2, Seq("core.FlakySpec"), Nil, "c") mustBe Left(
+        "ci-proof: FAILED 1 of 2 spec(s): core.FlakySpec"
+      )
+    }
+
+    // ISS-151136: a quarantine of a renamed spec proved nothing and passed.
+    it("fails a proof whose spec no suite defines, though nothing it ran failed") {
+      val verdict = CiTestLists.proofVerdict(0, Nil, Seq("old.pkg.RenamedSpec"), "c")
+      verdict.isLeft mustBe true
+      verdict.left.toOption.get must include("old.pkg.RenamedSpec")
+      verdict.left.toOption.get must startWith("ci-proof: FAILED ")
+    }
+
+    it("names both when a spec failed and another was not found") {
+      CiTestLists.proofVerdict(1, Seq("core.FlakySpec"), Seq("old.GoneSpec"), "c") mustBe Left(
+        "ci-proof: FAILED 1 of 1 spec(s): core.FlakySpec; 1 proof spec(s) no suite defines, so nothing proves them: old.GoneSpec"
+      )
+    }
+  }
+
   describe("shard suites") {
 
     it("reads one suite per line, skipping blank and comment lines") {
