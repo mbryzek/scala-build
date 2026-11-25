@@ -285,6 +285,26 @@ object CiTestLists {
   def unknownProof(lists: Lists, defined: Set[String], shard: Option[Set[String]]): Seq[String] =
     (lists.proof.filter(spec => shard.forall(_(spec))) -- defined).toSeq.sorted
 
+  /** What a proof says once every planned spec has run: `Right` the `ci-proof: passed` line when
+    * every one passed, else `Left` the `ci-proof: FAILED` line naming each spec that failed and each
+    * proof spec no suite read defines ([[unknownProof]]).
+    *
+    * A PROOF SPEC NO SUITE DEFINES FAILS THE PROOF (ISS-151136). A spec renamed or moved to another
+    * package has a quarantine row under its old name, and a proof of that name runs nothing: passed,
+    * it read as the fix proved, with no spec run. The proof is of the name the lists hold, so a name
+    * the tree no longer defines is a proof that cannot pass.
+    */
+  def proofVerdict(planned: Int, failed: Seq[String], unknown: Seq[String], counts: String): Either[String, String] =
+    if (failed.isEmpty && unknown.isEmpty) Right(s"ci-proof: passed $planned spec(s), $counts")
+    else {
+      val red =
+        if (failed.isEmpty) Nil else Seq(s"${failed.size} of $planned spec(s): ${failed.mkString(", ")}")
+      val gone =
+        if (unknown.isEmpty) Nil
+        else Seq(s"${unknown.size} proof spec(s) no suite defines, so nothing proves them: ${unknown.mkString(", ")}")
+      Left(s"ci-proof: FAILED ${(red ++ gone).mkString("; ")}")
+    }
+
   /** The report ScalaTest's JUnit reporter leaves for a suite. */
   def reportName(spec: String): String = s"TEST-$spec.xml"
 

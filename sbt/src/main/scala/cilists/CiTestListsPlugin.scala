@@ -19,7 +19,8 @@ import scala.util.control.NonFatal
   *   - `ciProof [<alone> <beside> [<clamped>]]`, which runs each `proof` spec `<alone>` times alone,
   *     `<clamped>` times alone with its forked test JVM under the machine's CPU clamp
   *     (`CiTestLists.cpuClamp`) and `<beside>` times with the rest of its subproject's specs, leaves
-  *     a report per run, proves every spec even after one failed, and fails if any run failed. No
+  *     a report per run, proves every spec even after one failed, and fails if any run failed or a
+  *     proof spec matched no suite, since a renamed spec's proof otherwise passes with none run. No
   *     arguments is 5, 3 and 2; two counts run no clamped run, and so does a subproject that does
   *     not fork its tests or a machine with no clamp, each saying so.
   *     Each run is named in the system property `CiTestLists.ProofRunProperty` while it runs, so a
@@ -156,18 +157,22 @@ object CiTestListsPlugin extends AutoPlugin {
         proofSpecs(state, CiTestLists.shardProjects(sys.env)) match {
           case None => state.fail
           case Some((next, defined)) =>
-            CiTestLists.unknownProof(l, defined.values.flatten.toSet, shard).foreach { spec =>
-              println(s"ci-lists: unknown $spec")
-            }
-            proveAll(next, CiTestLists.proofPlan(l, defined, shard), runs)
+            val unknown = CiTestLists.unknownProof(l, defined.values.flatten.toSet, shard)
+            unknown.foreach(spec => println(s"ci-lists: unknown $spec"))
+            proveAll(next, CiTestLists.proofPlan(l, defined, shard), unknown, runs)
         }
     }
   }
 
-  /** Proves every spec of the plan, a red one included, and fails at the end when any failed:
-    * [[CiTestLists.proveEvery]].
+  /** Proves every spec of the plan, a red one included, and fails at the end when any failed
+    * ([[CiTestLists.proveEvery]]) or when a proof spec matched no suite ([[CiTestLists.proofVerdict]]).
     */
-  private def proveAll(state: State, plan: Seq[(String, String)], runs: CiTestLists.ProofRuns): State = {
+  private def proveAll(
+    state: State,
+    plan: Seq[(String, String)],
+    unknown: Seq[String],
+    runs: CiTestLists.ProofRuns
+  ): State = {
     val clamp = if (runs.clamped > 0) CiTestLists.cpuClamp() else None
     if (runs.clamped > 0 && clamp.isEmpty)
       println("ci-proof: no CPU clamp (taskpolicy or taskset), so no clamped runs")
@@ -182,14 +187,15 @@ object CiTestListsPlugin extends AutoPlugin {
     val (last, failed) = CiTestLists.proveEvery(state, plan) { case (current, (project, spec)) =>
       prove(current, project, spec, runs, clamp.filterNot(_ => unforked.contains(project)))
     }
-    if (failed.nonEmpty) {
-      println(s"ci-proof: FAILED ${failed.size} of ${plan.size} spec(s): ${failed.map(_._2).mkString(", ")}")
-      last.fail
-    } else {
-      val clamped = if (clamp.isDefined && unforked.isEmpty) s", ${runs.clamped} clamped" else ""
-      val counts = if (clamped.isEmpty) s"${runs.alone} alone and" else s"${runs.alone} alone$clamped and"
-      println(s"ci-proof: passed ${plan.size} spec(s), $counts ${runs.beside} beside each")
-      last
+    val clamped = if (clamp.isDefined && unforked.isEmpty) s", ${runs.clamped} clamped" else ""
+    val counts = if (clamped.isEmpty) s"${runs.alone} alone and" else s"${runs.alone} alone$clamped and"
+    CiTestLists.proofVerdict(plan.size, failed.map(_._2), unknown, s"$counts ${runs.beside} beside each") match {
+      case Right(line) =>
+        println(line)
+        last
+      case Left(line) =>
+        println(line)
+        last.fail
     }
   }
 
