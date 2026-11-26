@@ -1,41 +1,41 @@
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 import java.util.Optional
 
+import classpathnames.ClasspathNames
 import sbt.internal.inc.caching.ClasspathCache
 import xsbti.{FileConverter, VirtualFile, VirtualFileRef}
 import xsbti.compile.{Changes, CompileAnalysis, ExternalHooks, FileHash}
 
-/** Zinc's classpath hash with every entry inside the checkout named relative to its root (ISS-44010).
+/** Zinc's classpath hash with every entry named independently of the machine and the checkout (ISS-44010,
+  * ISS-130704).
   *
   * Zinc stores the hash of the compile classpath in a subproject's analysis, path and content per entry, and reads a
   * different one as a changed classpath. A shard pulls the analysis its build's Prepare compiled in another checkout,
-  * so every sibling subproject's `target/.../classes` names another directory and the hash always differs. On a
-  * changed classpath zinc looks every class a library is recorded as providing up on the classpath, and Scala 3
-  * records the anonymous classes play-json's `Json.reads`, `Json.writes` and `Json.format` macros expand into (an
-  * `Outer$_$$anon`) as play-json's, a class no classpath holds: play-json is read as changed, and every source of the
-  * subproject that uses it compiles again. Measured on a platform shard, about 320 sources across core, assistant,
-  * family, integrations and idempotent before its first suite, in every shard of every build.
+  * often on another machine, so every sibling subproject's `target/.../classes` names another directory, and every
+  * library jar sits in another coursier cache whenever the shard's machine keeps it at another path (a Mac's
+  * `~/Library/Caches/Coursier` beside a Fly builder's `~/.cache/coursier`). On a changed classpath zinc looks every
+  * class a library is recorded as providing up on the classpath, and Scala 3 records the anonymous classes play-json's
+  * `Json.reads`, `Json.writes` and `Json.format` macros expand into (an `Outer$_$$anon`) as play-json's, a class no
+  * classpath holds: play-json is read as changed, and every source of the subproject that uses it compiles again.
+  * Measured on a platform shard, about 320 sources across core, assistant, family, integrations and idempotent before
+  * its first suite; a shard on a machine that did not run its build's Prepare started 5 to 25 minutes later than one
+  * that did.
   *
-  * Named from the root, the entries are the same in every checkout of one commit, so the hash compares equal and zinc
-  * takes its unchanged-classpath path, which reads a library as changed only when its own stamp moved. An entry
-  * outside the checkout (a library jar, the JDK) keeps its path, which is what it was.
+  * Named as [[ClasspathNames]] names them (`<checkout>/...`, `${CSR_CACHE}/...`), the entries are the same in every
+  * checkout of one commit on every runner, so the hash compares equal and zinc takes its unchanged-classpath path,
+  * which reads a library as changed only when its own stamp moved. Each entry's content hash is kept, so a library
+  * whose bytes differ still changes the hash.
   */
 object PathIndependentClasspath {
 
-  /** The name every path under the checkout root is given in place of the root. */
-  val RootName: Path = Paths.get("<checkout>")
+  def hash(prefixes: Seq[(Path, Path)], hashes: Array[FileHash]): Array[FileHash] =
+    hashes.map(h => FileHash.of(ClasspathNames.name(prefixes, h.file), h.hash))
 
-  /** `file` named relative to `root` when it lies under it, else unchanged. */
-  def relativeTo(root: Path, file: Path): Path =
-    if (file.startsWith(root)) RootName.resolve(root.relativize(file)) else file
-
-  def hash(root: Path, hashes: Array[FileHash]): Array[FileHash] =
-    hashes.map(h => FileHash.of(relativeTo(root, h.file), h.hash))
-
-  /** `hooks` whose classpath hash names entries under `root` relative to it: the lookup sbt installed when there is
-    * one, every other answer left to it.
+  /** `hooks` whose classpath hash names entries under `root` and under each of `roots` (sbt's `rootPaths`) from them:
+    * the lookup sbt installed when there is one, every other answer left to it.
     */
-  def hooks(hooks: ExternalHooks, root: Path, converter: FileConverter): ExternalHooks = {
+  def hooks(hooks: ExternalHooks, root: Path, roots: Map[String, Path], converter: FileConverter): ExternalHooks = {
+    val prefixes = ClasspathNames.prefixes(root, roots)
     val inner: Option[ExternalHooks.Lookup] =
       if (hooks.getExternalLookup.isPresent) Some(hooks.getExternalLookup.get) else None
     val lookup = new ExternalHooks.Lookup {
@@ -50,7 +50,7 @@ object PathIndependentClasspath {
       override def hashClasspath(classpath: Array[VirtualFile]): Optional[Array[FileHash]] = {
         val own = inner.map(_.hashClasspath(classpath)).filter(_.isPresent).map(_.get)
         val hashes = own.getOrElse(ClasspathCache.hashClasspath(classpath.toSeq.map(converter.toPath)))
-        Optional.of(hash(root, hashes))
+        Optional.of(hash(prefixes, hashes))
       }
     }
     hooks.withExternalLookup(lookup)
