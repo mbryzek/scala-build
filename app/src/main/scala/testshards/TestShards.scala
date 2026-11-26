@@ -13,8 +13,8 @@ import java.util.zip.CRC32
   *
   *   - The shard timings list suites with their usual seconds, one `<suite> <seconds>` per line.
   *     When they list any suite, the suites are placed longest first, each onto the least-loaded
-  *     shard so far, and a suite they do not list is weighted at their median. That is what keeps
-  *     one shard from finishing a minute after the rest.
+  *     shard so far, and a suite they do not list is weighted at their median; no suite weighs
+  *     under [[MinSuiteSeconds]]. That is what keeps one shard from finishing a minute after the rest.
   *   - When there are no timings, or they list no suite, a suite goes to the shard a stable hash of
   *     its name picks. Stable is the point: a suite's neighbours do not change from build to build,
   *     so a failure that depends on a neighbour reproduces on the next run instead of moving.
@@ -111,8 +111,8 @@ object TestShards {
   def shardsFor(suites: Seq[String], timings: Map[String, Double], floor: Int, ceiling: Int): Int =
     median(timings) match {
       case None => floor
-      case Some(unlisted) =>
-        val weight = suites.distinct.map(s => timings.getOrElse(s, unlisted)).sum
+      case Some(median) =>
+        val weight = suites.distinct.map(s => weigh(s, timings, median)).sum
         math.max(1, math.min(ceiling, math.ceil(weight / ShardSeconds).toInt))
     }
 
@@ -156,6 +156,16 @@ object TestShards {
     else Some((sorted(sorted.length / 2 - 1) + sorted(sorted.length / 2)) / 2)
   }
 
+  /** THE LEAST A SUITE WEIGHS (ISS-157770). Timings are whole seconds, so a suite under half a second reads 0, and
+    * a suite weighing 0 never makes the least-loaded shard heavier: longest-first packing would put every one of them
+    * on it. A suite the timings do not list, weighed at their median, is held to it too: a median of 0 is common.
+    */
+  val MinSuiteSeconds: Double = 1.0
+
+  /** A suite's weight: its listed seconds, else `median`, never under [[MinSuiteSeconds]]. */
+  def weigh(suite: String, timings: Map[String, Double], median: Double): Double =
+    math.max(MinSuiteSeconds, timings.getOrElse(suite, median))
+
   /** The shard a suite's name hashes to. CRC32 of the UTF-8 bytes, so it is the same on every JVM,
     * in the meta-build and in a test alike.
     */
@@ -171,9 +181,9 @@ object TestShards {
     val distinct = suites.distinct
     val placed: Map[Int, Seq[String]] = median(timings) match {
       case None => distinct.groupBy(hashShard(_, shards))
-      case Some(unlisted) =>
+      case Some(median) =>
         val weighted = distinct
-          .map(s => (s, timings.getOrElse(s, unlisted)))
+          .map(s => (s, weigh(s, timings, median)))
           .sortBy { case (s, w) => (-w, s) }
         val loads = Array.fill(shards)(0.0)
         weighted
@@ -290,11 +300,11 @@ object TestShards {
   ): Plan =
     median(timings) match {
       case None => Alone(0.0, "nothing measured in the shard timings")
-      case Some(unlisted) =>
+      case Some(median) =>
         val bySubproject =
           suites.toVector.map { case (sub, names) => sub -> names.distinct.toVector }.filter(_._2.nonEmpty).sortBy(_._1)
-        def weigh(names: Seq[String]): Double = names.map(s => timings.getOrElse(s, unlisted)).sum
-        val total = bySubproject.map { case (_, names) => weigh(names) }.sum
+        def weighAll(names: Seq[String]): Double = names.map(s => TestShards.weigh(s, timings, median)).sum
+        val total = bySubproject.map { case (_, names) => weighAll(names) }.sum
         if (sizing.isEmpty && total < SplitAtSeconds) Alone(total, s"under ${SplitAtSeconds.toInt} usual seconds")
         else {
           val count = sizing match {
@@ -308,12 +318,12 @@ object TestShards {
               case Some(s) => (share / measuredCut, s)
               case None => (share / UnmeasuredCut, 0.0)
             }
-            val weight = weigh(names)
+            val weight = weighAll(names)
             if (weight <= piece) Vector(Part(sub, sub, names.sorted, weight + start))
             else {
               val cut = assign(names, timings, math.ceil(weight / piece).toInt).filter(_.nonEmpty)
               cut.zipWithIndex.map { case (placed, i) =>
-                Part(sub, s"$sub ${i + 1} of ${cut.size}", placed, weigh(placed) + start)
+                Part(sub, s"$sub ${i + 1} of ${cut.size}", placed, weighAll(placed) + start)
               }
             }
           }

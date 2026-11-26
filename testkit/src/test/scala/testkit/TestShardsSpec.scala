@@ -114,6 +114,11 @@ class TestShardsSpec extends AnyFunSpec with Matchers {
       TestShards.shardsFor(Seq("a.A", "a.New"), timings, floor = 2, ceiling = 6) mustBe 2
       TestShards.shardsFor(Seq("a.C"), timings, floor = 2, ceiling = 6) mustBe 1
     }
+
+    it("weighs every suite at least one second, so a subproject of zeros still sizes by count") {
+      val zeros = (1 to 130).map(i => s"a.Z$i")
+      TestShards.shardsFor(zeros, zeros.map(_ -> 0.0).toMap, floor = 2, ceiling = 6) mustBe 3
+    }
   }
 
   describe("assign") {
@@ -148,6 +153,19 @@ class TestShardsSpec extends AnyFunSpec with Matchers {
 
     it("leaves a shard empty when there are fewer suites than shards") {
       TestShards.assign(Seq("a.A"), Map("a.A" -> 1.0), 3).map(_.length).sorted mustBe Vector(0, 0, 1)
+    }
+
+    it("weighs a suite timed at 0 at one second, so the zeros spread across the shards by count") {
+      val zeros = (1 to 12).map(i => f"a.Z$i%02d")
+      val timings = zeros.map(_ -> 0.0).toMap + ("a.Long" -> 3.0)
+      TestShards.assign(zeros :+ "a.Long", timings, 4).map(_.length) mustBe Vector(2, 4, 4, 3)
+    }
+
+    it("weighs a suite the file does not list at one second when the median reads 0") {
+      val timings = Map("a.A" -> 0.0, "a.B" -> 0.0, "a.C" -> 5.0)
+      TestShards.weigh("a.New", timings, TestShards.median(timings).get) mustBe 1.0
+      TestShards.weigh("a.A", timings, 0.0) mustBe 1.0
+      TestShards.weigh("a.C", timings, 0.0) mustBe 5.0
     }
   }
 
