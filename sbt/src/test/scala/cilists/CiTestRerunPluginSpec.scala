@@ -81,4 +81,29 @@ class CiTestRerunPluginSpec extends AnyFunSpec with Matchers {
       CiTestRerunPlugin.rerunPassed(Seq(stale), since) mustBe false
     }
   }
+
+  describe("forkDied") {
+
+    val died =
+      "Running java with options -classpath /build/sell/target/scala-3.10.0/test-classes sbt.ForkMain 41234 failed with exit code 143"
+
+    it("names the suite sbt reports for a forked test JVM that exited non-zero, so its subproject reruns whole") {
+      CiTestRerunPlugin.forkDied(Seq(died)) mustBe true
+      CiTestRerunPlugin.forkDied(Seq("sell.CheckoutSpec", died)) mustBe true
+    }
+
+    it("is false for real failing specs, which rerun as one testOnly") {
+      CiTestRerunPlugin.forkDied(Seq("sell.CheckoutSpec", "core.RunningSpec")) mustBe false
+      CiTestRerunPlugin.forkDied(Nil) mustBe false
+    }
+
+    it("reads the fork's made-up suite as failed, as sbt answers it, never as passed") {
+      val output = Tests.Output(
+        sbt.TestResult.Error,
+        Map(died -> sbt.SuiteResult.Error),
+        Nil
+      )
+      CiTestRerunPlugin.failedSpecs(output) mustBe Some(Seq(died))
+    }
+  }
 }

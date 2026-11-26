@@ -35,6 +35,15 @@ import scala.util.control.NonFatal
   * argument in `Test / testOptions` names, which is the one a build's `# ci-test-reports:` glob
   * declares. A `FIRST-` copy outside that glob is one the ledger never reads (ISS-59817).
   *
+  * A TEST FORK THAT DIES IS NOT A SPEC'S FAILURE. When a forked test JVM exits non-zero (a SIGTERM's
+  * 143, an OOM kill), sbt drops every answer that fork gave and reports one made-up suite in their
+  * place, named `Running java with options <the command line>`. Rerunning that name as `testOnly`
+  * runs nothing and reads green, which left a killed fork's unstarted suites unreported behind a
+  * green shard (ISS-156727). So a subproject whose answer holds that name reruns its whole
+  * `Test / executeTests` once, under the same filter, and that second run is the subproject's
+  * answer: every spec it fails is `ci-rerun: failed again:`, and a fork that dies again leaves the
+  * build red with `ci-rerun: <subproject>: the test fork died again` naming why.
+  *
   * `ci-test-phase: <n>s` is the wall time of one phase's suite alone, before any rerun, a line per
   * phase: a repository's slow ceiling is a share of their sum, and a rerun is not the phase every pull
   * request waits on.
@@ -94,6 +103,14 @@ object CiTestRerunPlugin extends AutoPlugin {
     val failed = output.events.toSeq.collect { case (spec, r) if r.result != TestResult.Passed => spec }.sorted
     if (output.overall != TestResult.Passed && failed.isEmpty) None else Some(failed)
   }
+
+  /** The name sbt gives the one suite it reports for a forked test JVM that exited non-zero, in
+    * place of every answer that fork gave (sbt's `ForkTests`).
+    */
+  val ForkDiedPrefix = "Running java with options "
+
+  /** Whether a subproject's failed specs include the made-up suite of a test fork that died. */
+  def forkDied(specs: Seq[String]): Boolean = specs.exists(_.startsWith(ForkDiedPrefix))
 
   /** Every directory a subproject's test run writes `TEST-<suite>.xml` into: `sbtReports`, sbt's
     * own JUnit reporter's, then each directory a ScalaTest `-u` argument names, a relative one
@@ -192,7 +209,8 @@ object CiTestRerunPlugin extends AutoPlugin {
   private def rerunAll(state: State, failing: Seq[(String, Seq[String])]): (State, Seq[(String, Boolean)]) = {
     val (last, outcomes) = failing.foldLeft((state, Seq.empty[(String, Boolean)])) {
       case ((current, acc), (project, specs)) =>
-        val (next, passed) = rerun(current, project, specs)
+        val (next, passed) =
+          if (forkDied(specs)) rerunWhole(current, project) else rerun(current, project, specs)
         (next, acc ++ passed)
     }
     outcomes.foreach {
@@ -221,6 +239,34 @@ object CiTestRerunPlugin extends AutoPlugin {
         if (verdict.lines.nonEmpty) println("ci-rerun: done")
         println("ci-verdict: passed")
         state
+    }
+  }
+
+  /** A subproject whose test fork died, every suite of it rerun once in its own `Test / executeTests`:
+    * the specs that second run failed, answered not passed, and nothing more when it is green. A
+    * fork that dies again is answered by the subproject's name, which no spec carries, so the phase
+    * is red and its line says why.
+    */
+  private def rerunWhole(state: State, project: String): (State, Seq[(String, Boolean)]) = {
+    val extracted = Project.extract(state)
+    val ref = extracted.structure.allProjectRefs.find(_.project == project).getOrElse(sys.error(s"no project $project"))
+    println(s"ci-rerun: $project: the test fork died before its suites answered — rerunning every suite in $project")
+    attempt(extracted.runTask(ref / ciProjectTests, state)) match {
+      case None =>
+        println(s"ci-rerun: $project: the rerun did not run to a result")
+        (state, Seq(s"$project (test fork)" -> false))
+      case Some((next, (_, output))) =>
+        failedSpecs(output) match {
+          case None =>
+            println(s"ci-rerun: $project: failed again and no suite in it did")
+            (next, Seq(s"$project (test fork)" -> false))
+          case Some(specs) if forkDied(specs) =>
+            println(s"ci-rerun: $project: the test fork died again")
+            (next, specs.filterNot(_.startsWith(ForkDiedPrefix)).map(_ -> false) :+ (s"$project (test fork)" -> false))
+          case Some(specs) =>
+            if (specs.isEmpty) println(s"ci-rerun: $project: every suite passed its rerun")
+            (next, specs.map(_ -> false))
+        }
     }
   }
 
