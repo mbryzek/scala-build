@@ -151,6 +151,7 @@ lazy val testkit = project
       appSources / "testimpact" / "TestImpact.scala",
       appSources / "copiedresources" / "CopiedResources.scala",
       appSources / "cacheentries" / "CacheEntries.scala",
+      appSources / "classpathnames" / "ClasspathNames.scala",
       appSources / "TestDatabases.scala"
     )
   )

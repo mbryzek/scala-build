@@ -128,14 +128,16 @@ object CompileCachePlugin extends AutoPlugin {
       }
     }
 
-  /** Zinc's classpath hash named from the checkout root, so an analysis pulled into another checkout of the same
-    * commit reads its classpath as unchanged ([[PathIndependentClasspath]], ISS-44010).
+  /** Zinc's classpath hash named from the checkout root and from sbt's `rootPaths` (the coursier cache, the JDK), so
+    * an analysis pulled into another checkout of the same commit, on any runner, reads its classpath as unchanged
+    * ([[PathIndependentClasspath]], ISS-44010, ISS-130704).
     */
   private def pathIndependentClasspath: Seq[Setting[?]] =
     Seq(Compile, Test).map { config =>
       config / SbtExternalHooks.key := PathIndependentClasspath.hooks(
         (config / SbtExternalHooks.key).value,
         (LocalRootProject / baseDirectory).value.toPath.toAbsolutePath,
+        (ThisBuild / rootPaths).value,
         fileConverter.value,
       )
     }
