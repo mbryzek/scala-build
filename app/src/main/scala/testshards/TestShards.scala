@@ -103,10 +103,12 @@ object TestShards {
   /** How many shards a subproject's suites are split into.
     *
     * With no timings, `floor`, each suite placed by its hash, as before timings existed. With timings,
-    * one shard per [[ShardSeconds]] of the subproject's measured time — a suite the file does not list
-    * weighted at its median — between 1 and `ceiling`. So a subproject of a few seconds is one fork
-    * rather than `floor` forks each booting Play for a handful of suites, and the largest is split as
-    * wide as the build can ever run it, which is what bounds the slowest shard (ISS-25548).
+    * one shard per [[ShardSeconds]] of the subproject's suites, each weighed by [[weigh]]: its listed
+    * seconds, or the median for a suite the file does not list, never under [[MinSuiteSeconds]], between
+    * 1 and `ceiling`. So a subproject whose suites are few and fast is one fork rather than `floor` forks
+    * each booting Play for a handful of suites, a subproject of many suites timed at 0 still spreads (130
+    * of them size to 3 shards), and the largest is split as wide as the build can ever run it, which is
+    * what bounds the slowest shard (ISS-25548).
     */
   def shardsFor(suites: Seq[String], timings: Map[String, Double], floor: Int, ceiling: Int): Int =
     median(timings) match {
@@ -276,8 +278,9 @@ object TestShards {
     */
   val UnmeasuredCut: Int = 2
 
-  /** The shard plan for a build whose suites are `suites`, by subproject, weighted by `timings`
-    * and, for a suite `timings` does not list, by its median.
+  /** The shard plan for a build whose suites are `suites`, by subproject, each suite weighed by [[weigh]]:
+    * its seconds in `timings`, or their median for a suite `timings` does not list, never under
+    * [[MinSuiteSeconds]].
     *
     * A build splits at [[SplitAtSeconds]] into one shard per [[SplitShardSeconds]], between
     * [[SplitMinShards]] and [[SplitMaxShards]]. With a Prepare's `sizing` a build always splits, [[Exactly]] into the
