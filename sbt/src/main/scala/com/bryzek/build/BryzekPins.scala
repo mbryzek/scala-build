@@ -57,14 +57,13 @@ object BryzekPins {
   //
   // Those two are the binding ones: the lowest this pin may state is 2.18.11, anything chosen on
   // the 2.19-2.21 lines must be 2.21.7 or above, and anything on the 2.22 line must be 2.22.3 or
-  // above. 2.22.3 is the head of the Jackson 2 line and the version platform and acumen pin, so a
-  // consumer that pins too resolves one Jackson rather than two.
+  // above.
   //
   // jackson-annotations publishes no patch versions on its 2.20+ lines (maven-metadata.xml runs
-  // 2.19.4, 2.20, 2.21, 2.22), so it carries its own version and a patch number there is a 404
+  // 2.19.4, 2.20, 2.21, 2.22, 2.23), so it carries its own version and a patch number there is a 404
   // that fails the whole resolution.
-  val jacksonVersion = "2.22.3"
-  val jacksonAnnotationsVersion = "2.22"
+  val jacksonVersion = "2.23.0"
+  val jacksonAnnotationsVersion = "2.23"
 
   val jackson2: Seq[ModuleID] = Seq(
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,

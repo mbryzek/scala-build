@@ -86,11 +86,13 @@ abstract class JacksonPinSuite extends AnyWordSpec with Matchers {
     }
 
     "apply the PolymorphicTypeValidator to a type id's generic ARGUMENTS, not just its raw class" in {
-      // The validator allows exactly one container and nothing else, so `java.util.HashMap` is a
+      // The validator allows exactly one container and nothing else, so `java.io.File` is a
       // denied type here. It is named as a generic ARGUMENT of the allowed container rather than
       // on its own, which is the bypass: a type id containing `<` was validated by the substring
       // before it, and the arguments parsed out of the rest were resolved and instantiated
-      // without ever being offered to the validator.
+      // without ever being offered to the validator. The argument is not a JDK container, because
+      // databind may approve one of those unasked and validate its contents instead, and it
+      // deserializes from the element given, so an unchecked argument reads successfully.
       val mapper = JsonMapper
         .builder()
         .activateDefaultTyping(
@@ -101,11 +103,11 @@ abstract class JacksonPinSuite extends AnyWordSpec with Matchers {
 
       val thrown = intercept[DatabindException] {
         mapper.readValue(
-          """[["java.util.ArrayList<java.util.HashMap>",[{"a":"b"}]]]""",
+          """[["java.util.ArrayList<java.io.File>",["a"]]]""",
           new TypeReference[java.util.List[Object]] {},
         )
       }
-      thrown.getMessage must include("java.util.HashMap")
+      thrown.getMessage must include("java.io.File")
     }
 
     "apply the PolymorphicTypeValidator to an array's COMPONENT type, not just to its arrayness" in {
