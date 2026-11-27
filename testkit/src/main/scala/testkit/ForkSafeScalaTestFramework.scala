@@ -34,7 +34,7 @@ import scala.util.control.NonFatal
   * join forever, the test task never reports complete, and sbt's task engine waits on the task.
   * There is no timeout anywhere on that path and the `ServerSocket` is never closed to break it.
   *
-  * That is not a hypothesis. It is the thread dump `ci/stall-watchdog` collected from a wedged run
+  * That is not a hypothesis. It is the thread dump devops' `templates/scala-app/ci/stall-watchdog` collected from a wedged run
   * on unmodified `main`, kept at `~/code/claude/plans/data/iss-761-run04-wedge-jstack.txt`: sbt's
   * test task in `Framework$ScalaTestRunner.done` -> `Thread.join`, and beside it one RUNNABLE
   * thread in `Framework$Skeleton$1.socket` -> `ServerSocket.accept`, with no `sbt.ForkMain` process
@@ -59,7 +59,7 @@ import scala.util.control.NonFatal
   *
   * Delete this subproject, scala-build-app's `ForkSafeTestFrameworkPlugin.scala` and the two
   * `dependsOn(testkit % Test)` lines in `build.sbt`, and keep the scalatest bump.
-  * `ci/stall-watchdog` stays either way. Nothing here polls upstream, so the thing that will
+  * devops' `templates/scala-app/ci/stall-watchdog` stays either way. Nothing here polls upstream, so the thing that will
   * NOTICE is `ForkSafeScalaTestFrameworkSpec`'s last test: it asserts the bug is still present, so
   * it goes red on the first build that has the fix, and its failure message is that checklist.
   *
@@ -92,7 +92,7 @@ import scala.util.control.NonFatal
   * sbt's own fork socket (`sbt.ForkTests`), which has already delivered them by the time `done()`
   * is called; this socket carries ScalaTest's reporting only.
   *
-  * `ci/stall-watchdog` stays exactly as it was. This removes the only wedge we have an artifact
+  * devops' `templates/scala-app/ci/stall-watchdog` stays exactly as it was. This removes the only wedge we have an artifact
   * for; the watchdog is what bounds the ones we do not.
   */
 class ForkSafeScalaTestFramework extends Framework {
@@ -104,7 +104,7 @@ class ForkSafeScalaTestFramework extends Framework {
 
   /** Overridable for the same reason, in the other direction: a test that asserts the unwedge
     * WORKED needs a grace it cannot be starved out of, since the shipped 30s is sized against
-    * `ci/stall-watchdog` rather than against how long a released join can take on a loaded box.
+    * devops' `templates/scala-app/ci/stall-watchdog` rather than against how long a released join can take on a loaded box.
     */
   protected def unwedgeGraceMillis: Long = ForkSafeScalaTestFramework.UnwedgeGraceMillis
 
@@ -148,7 +148,7 @@ object ForkSafeScalaTestFramework {
   /** Two minutes. `done()` is called only after sbt has already reaped the forked JVM and joined
     * its own acceptor, so the legitimate remaining wait is however long it takes to drain events
     * already in flight — milliseconds. Two minutes is far past any plausible drain and still well
-    * inside `ci/stall-watchdog`'s 480s, so this releases the build before the watchdog kills it.
+    * inside devops' `templates/scala-app/ci/stall-watchdog`'s 480s, so this releases the build before the watchdog kills it.
     */
   val DefaultDoneTimeoutMillis: Long = 120000L
 
@@ -156,7 +156,7 @@ object ForkSafeScalaTestFramework {
     *
     * The join normally returns in milliseconds, so this is not a budget for the release — it is the
     * point at which we would rather hand the build a diagnostic than keep holding it. 30s keeps
-    * that decision well inside `ci/stall-watchdog`'s 480s.
+    * that decision well inside devops' `templates/scala-app/ci/stall-watchdog`'s 480s.
     */
   val UnwedgeGraceMillis: Long = 30000L
 

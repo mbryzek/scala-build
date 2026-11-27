@@ -132,7 +132,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * This does not stop forks dying, and it is not a diagnosis of why they do. It makes the failure
  * ARRIVE, with a probe of sbt's socket and the fork's own last position attached, so an occurrence
- * is evidence instead of a stall. {@code ci/stall-watchdog} stays either way: it bounds the wedges
+ * is evidence instead of a stall. devops' {@code templates/scala-app/ci/stall-watchdog} stays either way: it bounds the wedges
  * we have no artifact for.
  *
  * <p>Nor does it make the failure SURVIVABLE. What sbt reports for exit 86 is

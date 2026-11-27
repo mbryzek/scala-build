@@ -60,6 +60,14 @@ Its plugins trigger on their own, so a library never adds it:
 - On every project: `CiShardPlugin`, `CompileCachePlugin`, `CompileProfilePlugin`,
   `NoScaladocPlugin`, `BuildDefinitionMarkerPlugin` and `testimpact.TestImpactPlugin`.
 
+`BuildDefinitionMarkerPlugin` owns the build definition id and `target/.ci-build-definition`, the
+marker naming the definition a checkout's compiled output was produced under
+(`builddefinition.BuildDefinition`). On every load it claims the marker for a checkout holding no
+compiled output; under `CI_BUILD_DEFINITION_CLEAN=1`, which a CI build sets, it removes output
+compiled under another or an unknown definition first; and under `CI_COMPILE_CACHE_PUSH` it fails
+the load unless the marker names the definition the tree holds, so a cache push never publishes
+another definition's output. No application's shell computes the id.
+
 And in every build.sbt: `TestDatabases`, `TestDatabasePlugin.ShardTag` and `admitShard` for
 `concurrentRestrictions`; `AutonomyWorkflowRegistry.generator` and
 `OneTimeMigrationRegistry.generator`, through `RegisteredByExistence`, for a registry generated

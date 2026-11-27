@@ -457,7 +457,7 @@ private object ForkSafeExitAgentSpec {
       "`ForkMain.main`'s `finally { System.exit(0); }` is gone, or `ForkTests` no longer joins its " +
       "acceptor unconditionally. If it is: delete `ForkSafeExitAgent`, this spec, the `-javaagent` " +
       "block in scala-build-app's `ForkSafeTestFrameworkPlugin.scala`, and testkit's `Premain-Class` and " +
-      "`test-agent` lines in build.sbt. `ci/stall-watchdog` stays either way."
+      "`test-agent` lines in build.sbt. devops' `templates/scala-app/ci/stall-watchdog` stays either way."
 
   final case class Run(status: Int, output: String)
 
