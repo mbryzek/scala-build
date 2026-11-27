@@ -37,7 +37,7 @@ class ForkSafeScalaTestFrameworkSpec extends AnyFunSpec with Matchers {
   /** How long a released join is given here. Deliberately far above the shipped
     * `UnwedgeGraceMillis`, and it is NOT a timing assertion: the join returns in milliseconds when
     * the unwedge worked, so this is only the point past which we would rather fail the test than
-    * hang it. The shipped 30s is sized against `ci/stall-watchdog`, and this subproject is
+    * hang it. The shipped 30s is sized against devops' `templates/scala-app/ci/stall-watchdog`, and this subproject is
     * `Test / fork := false` — it runs in the sbt JVM, next to whatever the build is compiling — so
     * borrowing that number is what let a stalled JVM report a working unwedge as a broken one.
     */
@@ -278,7 +278,7 @@ private object ForkSafeScalaTestFrameworkSpec {
       "subproject exists to work around (ISS-1380) looks FIXED upstream. If it is: delete " +
       "`testkit`, scala-build-app's `ForkSafeTestFrameworkPlugin.scala` and the two " +
       "`dependsOn(testkit % Test)` lines in build.sbt, keeping the scalatest bump that fixed it. " +
-      "`ci/stall-watchdog` stays either way. See ISS-1400."
+      "devops' `templates/scala-app/ci/stall-watchdog` stays either way. See ISS-1400."
 
   /** Fixed `lsof` text, so the ownership verdict is asserted against known input and not against
     * whatever happens to be listening on the machine running this suite.
