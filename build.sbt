@@ -110,7 +110,7 @@ lazy val app = project
       Defaults.sbtPluginExtra("org.playframework" % "sbt-plugin" % "3.0.12", "1.0", "2.12") % Provided,
       // `TestDatabases` drives the driver directly. Provided: each application's meta-build declares
       // it at the version its own `core` uses, so the build and the application never resolve two.
-      "org.postgresql" % "postgresql" % "42.7.14" % Provided,
+      "org.postgresql" % "postgresql" % "42.7.15" % Provided,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test
     )
   )
@@ -135,7 +135,7 @@ lazy val testkit = project
       // `sbt.ForkMain`, the forked-test agent sbt runs, which `ForkSafeExitAgentSpec` starts as a
       // real subprocess: pinned to the sbt an application runs, the ForkMain its forks get.
       "org.scala-sbt" % "test-agent" % appSbtVersion % Test,
-      "org.postgresql" % "postgresql" % "42.7.14" % Test
+      "org.postgresql" % "postgresql" % "42.7.15" % Test
     ),
     // What makes this jar usable as `-javaagent`; it is the plain Test library otherwise.
     Compile / packageBin / packageOptions +=
